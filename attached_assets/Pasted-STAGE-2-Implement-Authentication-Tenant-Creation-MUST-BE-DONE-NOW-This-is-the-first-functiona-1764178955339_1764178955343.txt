@@ -1,0 +1,179 @@
+STAGE 2 — Implement Authentication + Tenant Creation (MUST BE DONE NOW)
+
+This is the first functional block before dashboards, invoices, or AI can work.
+
+⚡ What needs to be built next:
+1. Implement Supabase Auth Integration
+
+Replit (or you) needs to:
+
+Create a supabaseClient helper
+
+Add sign-in page
+
+Add callback handler
+
+Store user session in server components (middleware)
+
+Then, upon first login:
+
+2. Auto-create: Tenant → User → Company
+
+When a new Supabase user signs in:
+
+Create a Tenant
+
+Assign this new user to that tenant (tenantId)
+
+Create a Company row for them (placeholder fields)
+
+Create a Subscription row (default free plan)
+
+Redirect user to /dashboard/settings/company
+
+This gives you a fully-initialised account, ready to use the app.
+
+🧩 Next.js Routes Replit must create now:
+/auth/sign-in
+
+Magic link login
+
+/auth/callback
+
+Processes Supabase session — triggers:
+
+Create Tenant
+
+Create User row
+
+Create Company row
+
+Create Subscription row
+
+Then redirect → /dashboard
+
+✨ What you should tell Replit to do next
+
+Paste this into Replit:
+
+REPLIT TASK: Implement Authentication + Tenant Initialisation
+
+You must now implement:
+
+1. Supabase Auth Setup
+
+Create helper:
+
+/lib/supabase/server.ts
+/lib/supabase/client.ts
+
+
+Use:
+
+import { createClient } from '@supabase/supabase-js';
+
+
+Load env vars:
+
+SUPABASE_URL
+
+SUPABASE_ANON_KEY
+
+SUPABASE_SERVICE_ROLE_KEY
+
+2. Sign-in Page UI
+
+Path:
+
+/app/auth/sign-in/page.tsx
+
+
+UI includes:
+
+logo
+
+email field
+
+“Send magic link” button
+
+Supabase’s signInWithOtp
+
+3. Auth Callback Route
+
+Path:
+
+/app/auth/callback/route.ts
+
+
+Steps:
+
+a) Read Supabase session
+
+Get user id + email.
+
+b) Check if this user exists in Prisma
+
+If NOT:
+
+Create Tenant
+
+Create User tied to that tenant
+
+Create Company tied to tenant
+
+Create Subscription row with the free plan
+
+c) Store the session
+
+Use Supabase cookie helpers.
+
+d) Redirect to /dashboard
+4. Protect all dashboard routes
+
+Middleware:
+
+/middleware.ts
+
+
+If no Supabase session → redirect to /auth/sign-in.
+
+5. Make a hook to get the current tenant
+
+Place in:
+
+/lib/auth/getTenant.ts
+
+
+Return:
+
+tenantId
+
+shard
+
+company profile
+
+current User
+
+Everything downstream will rely on this.
+
+Tell Replit to implement everything above in code, file by file, following the architecture.
+
+🎯 After Authentication Is Done
+
+Once auth + tenant-creation is working, the next phase will be:
+
+Stage 3 — Company Settings Page
+
+Where users update:
+
+company name
+
+logo upload
+
+address
+
+phone
+
+tax number
+
+— and it saves into the Company table with correct tenantId.
