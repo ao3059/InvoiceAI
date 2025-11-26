@@ -6,8 +6,13 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import session from "express-session";
+import memorystore from "memorystore";
 
 import { registerRoutes } from "./routes";
+import { seedPlans } from "./db/seed";
+
+const MemoryStore = memorystore(session);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -27,6 +32,32 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+declare module 'express-session' {
+  interface SessionData {
+    user?: {
+      id: string;
+      email: string;
+      tenantId: string;
+      role: string;
+    };
+  }
+}
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemoryStore({
+    checkPeriod: 86400000
+  }),
+  cookie: {
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+  }
+}));
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
@@ -67,14 +98,20 @@ app.use((req, res, next) => {
 export default async function runApp(
   setup: (app: Express, server: Server) => Promise<void>,
 ) {
+  await seedPlans();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
+    const status = err.statusCode || err.status || 500;
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    
+    if (status >= 500) {
+      console.error("Server error:", err);
+      throw err;
+    }
   });
 
   // importantly run the final setup after setting up all the other routes so
