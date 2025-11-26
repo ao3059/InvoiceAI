@@ -1,0 +1,158 @@
+THE NEXT STEP NOW IS: STAGE 3 — FULL COMPANY SETTINGS PAGE
+
+This is the next milestone for a functional demo and Beta rollout.
+
+📌 You need: /dashboard/settings/company
+
+Where users can update:
+
+Required
+
+✔ Company name
+✔ Address lines
+✔ City
+✔ Postcode
+✔ Country
+✔ Phone
+✔ Email
+✔ Tax/VAT Number
+✔ Company logo upload (to storage bucket)
+
+The page must:
+
+Load existing company info via tenantId
+
+Display form populated with correct values
+
+Validate on client (Zod)
+
+Validate on server
+
+Update Prisma Company model
+
+Store logo on server or in cloud storage
+
+Use your existing auth/tenant context
+
+Show toast notifications for success/errors
+
+⭐ Once THAT page is complete: STAGE 4 — Invoice Generation (AI Flow)
+
+This is the core of InvoiceAI.
+
+Workflow to implement next:
+
+/dashboard/invoices/new
+
+Textarea: “Describe what you did”
+
+Optional: client name/email/address input
+
+Server Action / API Route:
+
+Uses OpenAI
+
+Validates JSON response
+
+Creates invoice + items in DB
+
+Recalculates totals server-side
+
+Logs activity
+
+Redirect to /dashboard/invoices/[id]
+
+Shows created invoice
+
+Preview
+
+Send email
+
+Download PDF
+
+⭐ What I suggest YOU DO RIGHT NOW
+Tell Replit to implement the full Company Settings page.
+
+Paste the following prompt into Replit’s AI:
+
+✨ REPLIT TASK: Build Company Settings Page (Critical Path)
+
+Implement the full company settings page at:
+
+/app/dashboard/settings/company/page.tsx
+
+Requirements:
+1. UI
+
+Use Tailwind + ShadCN UI form components
+
+Pre-fill fields using the current tenant’s Company record
+
+Fields:
+
+name
+
+addressLine1
+
+addressLine2
+
+city
+
+postcode
+
+country
+
+phone
+
+email
+
+taxNumber
+
+logo upload
+
+2. Logo Upload
+
+File input
+
+Upload to storage (same system the app uses today)
+
+Save storage URL in the Company.logoUrl field
+
+3. Validation
+
+Client-side: Zod schema
+
+Server-side: validate again in server action or API route
+
+Ensure tenantId is included and enforced
+
+4. Save Action
+
+POST or Server Action
+
+Update Company record in Prisma
+
+Return updated data
+
+Show toast notifications
+
+5. Consider Multi-tenant Scope
+
+Always access company data through the tenant context (tenantId)
+
+Prevent cross-tenant access
+
+6. File Outputs
+
+Provide:
+
+The page component
+
+Form component
+
+Zod schema
+
+API route / server action
+
+Updated company provider or hook (if needed)
+

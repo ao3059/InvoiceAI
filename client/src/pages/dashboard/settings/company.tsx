@@ -20,6 +20,8 @@ export default function CompanySettings() {
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("");
   const [taxNumber, setTaxNumber] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -39,6 +41,7 @@ export default function CompanySettings() {
       setPostalCode(company.postalCode || "");
       setCountry(company.country || "");
       setTaxNumber(company.taxNumber || "");
+      setLogoUrl(company.logoUrl || null);
     }
   }, [company]);
 
@@ -76,17 +79,46 @@ export default function CompanySettings() {
       postalCode,
       country,
       taxNumber,
+      logoUrl,
     });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
       toast({
-        title: "Logo selected",
-        description: `Ready to upload: ${file.name}`,
+        title: "File too large",
+        description: "Logo must be less than 2MB",
+        variant: "destructive",
       });
+      return;
     }
+
+    setIsUploadingLogo(true);
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setLogoUrl(base64);
+      setIsUploadingLogo(false);
+      toast({
+        title: "Logo uploaded",
+        description: "Your logo is ready to save",
+      });
+    };
+
+    reader.onerror = () => {
+      setIsUploadingLogo(false);
+      toast({
+        title: "Upload failed",
+        description: "Could not read file",
+        variant: "destructive",
+      });
+    };
+
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -107,8 +139,12 @@ export default function CompanySettings() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-6">
-            <div className="h-24 w-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted">
-              <Building2 className="h-10 w-10 text-muted-foreground" />
+            <div className="h-24 w-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Company logo" className="h-full w-full object-cover" />
+              ) : (
+                <Building2 className="h-10 w-10 text-muted-foreground" />
+              )}
             </div>
             <div>
               <input
@@ -117,19 +153,32 @@ export default function CompanySettings() {
                 accept="image/png,image/jpeg,image/jpg"
                 className="hidden"
                 onChange={handleFileChange}
+                disabled={isUploadingLogo}
                 data-testid="input-logo-upload"
               />
               <Button
                 variant="outline"
                 onClick={() => document.getElementById("logo-upload")?.click()}
+                disabled={isUploadingLogo}
                 data-testid="button-upload-logo"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload Logo
+                {isUploadingLogo ? "Uploading..." : "Upload Logo"}
               </Button>
               <p className="text-sm text-muted-foreground mt-2">
                 PNG, JPG up to 2MB
               </p>
+              {logoUrl && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 text-destructive"
+                  onClick={() => setLogoUrl(null)}
+                  data-testid="button-remove-logo"
+                >
+                  Remove Logo
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
