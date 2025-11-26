@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import { aiInvoiceResponseSchema, type AIInvoiceResponse } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function generateInvoiceFromDescription(
@@ -28,7 +27,7 @@ Description: ${description}${clientName ? `\nClient Name: ${clientName}` : ''}${
 Output the invoice data as JSON.`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },

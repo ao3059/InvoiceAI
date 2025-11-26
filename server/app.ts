@@ -7,12 +7,15 @@ import express, {
   NextFunction,
 } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import memorystore from "memorystore";
 
 import { registerRoutes } from "./routes";
 import { seedPlans } from "./db/seed";
+import { pool } from "./db/index";
 
 const MemoryStore = memorystore(session);
+const PgSession = connectPgSimple(session);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -26,6 +29,11 @@ export function log(message: string, source = "express") {
 }
 
 export const app = express();
+
+// Trust proxy for Railway/production environments
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 declare module 'http' {
   interface IncomingMessage {
@@ -44,17 +52,27 @@ declare module 'express-session' {
   }
 }
 
+// Use PostgreSQL session store in production for persistence
+const sessionStore = process.env.NODE_ENV === 'production'
+  ? new PgSession({
+      pool: pool,
+      tableName: 'session',
+      createTableIfMissing: true,
+    })
+  : new MemoryStore({
+      checkPeriod: 86400000
+    });
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
-  store: new MemoryStore({
-    checkPeriod: 86400000
-  }),
+  store: sessionStore,
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
   }
 }));
 
