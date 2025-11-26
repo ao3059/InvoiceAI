@@ -175,8 +175,8 @@ export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export const aiInvoiceResponseSchema = z.object({
   client: z.object({
     name: z.string(),
-    email: z.string().email().optional(),
-    address: z.string().optional(),
+    email: z.string().email().optional().nullable(),
+    address: z.string().optional().nullable(),
   }),
   items: z.array(z.object({
     description: z.string(),
@@ -184,8 +184,8 @@ export const aiInvoiceResponseSchema = z.object({
     price: z.number().positive(),
   })),
   currency: z.string().default("GBP"),
-  notes: z.string().optional(),
-  due_date: z.string().optional(),
+  notes: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
 });
 
 export type AIInvoiceResponse = z.infer<typeof aiInvoiceResponseSchema>;
