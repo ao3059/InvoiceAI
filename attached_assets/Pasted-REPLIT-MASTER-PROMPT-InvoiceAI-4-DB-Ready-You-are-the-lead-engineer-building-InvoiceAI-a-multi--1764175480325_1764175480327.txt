@@ -1,0 +1,312 @@
+REPLIT MASTER PROMPT – InvoiceAI, 4-DB Ready
+
+You are the lead engineer building InvoiceAI, a multi-tenant SaaS used by contractors and small businesses to generate invoices from natural-language prompts.
+
+You must produce production-quality, multi-tenant, and future-shardable code following the instructions below.
+
+1. Product Summary
+
+InvoiceAI lets users:
+
+Sign up / log in (Supabase Auth magic links)
+
+Configure their company profile (logo, address, tax number)
+
+Describe work in plain English → AI generates a structured invoice
+
+Preview invoice, download PDF, and send via email
+
+Store and list past invoices
+
+See activity logs (e.g., invoice created, sent, paid)
+
+There is also an admin area:
+
+/admin/users – shows tenants/users, plans, usage, upgrade suggestions
+
+/admin/activity – live activity feed with filters and CSV export
+
+2. Tech Stack
+
+Use exactly:
+
+Frontend
+
+Next.js 14 (App Router)
+
+React
+
+Tailwind CSS
+
+ShadCN UI
+
+React Hook Form + Zod
+
+Backend
+
+Next.js server components + Route Handlers / Server Actions
+
+Supabase (Auth + Storage)
+
+PostgreSQL via Prisma ORM
+
+AI
+
+OpenAI (GPT-4 or better)
+
+Responses must be strict JSON
+
+Other
+
+Stripe for billing (per-tenant subscription)
+
+PostHog for analytics
+
+Sentry for error tracking
+
+Resend (or similar) for sending invoice emails
+
+3. Multi-Tenant & 4-Database Design
+
+You are building Phase 1, but the design must easily support Phase 3: split into 4 physical databases.
+
+Phase 1 (Now)
+
+Use one Postgres database via DATABASE_URL.
+
+Implement full multi-tenant logic with a Tenant model and tenantId on all tenant-specific tables.
+
+All queries MUST be scoped by tenantId.
+
+Phase 2/3 (Later – you must design for this)
+
+There will be one control DB + up to 4 shard DBs.
+
+Tenant.shard (1–4) tells the app which physical database to use.
+
+DB URLs will look like:
+
+CONTROL_DATABASE_URL
+
+SHARD_1_DATABASE_URL
+
+SHARD_2_DATABASE_URL
+
+SHARD_3_DATABASE_URL
+
+SHARD_4_DATABASE_URL
+
+For now, they can all point to the same DB, but code should centralize DB access through a helper.
+
+Create a helper (e.g. lib/db/router.ts) that:
+
+Given tenantId or userId, loads the Tenant and its shard.
+
+Returns the correct Prisma client (in Phase 1, they all use the same underlying client, but the abstraction is there).
+
+All application code must call the database via this router, not directly.
+
+4. Prisma Schema (Use EXACTLY This)
+
+Use this schema verbatim for prisma/schema.prisma (do not invent other models or rename fields):
+
+<PASTE THE SCHEMA FROM SECTION 1 HERE>
+
+
+(Keep it intact when you paste into Replit.)
+
+5. Core Features to Implement
+
+At minimum, implement these:
+
+Authentication & Tenants
+
+Supabase Auth (magic link)
+
+On first login:
+
+Create User row using Supabase user.id and email
+
+Create a Tenant and assign the user as its first member
+
+Create a default Company record for the tenant
+
+Company Settings
+
+/dashboard/settings/company
+
+Form to edit:
+
+Company name, address, contact, tax number
+
+Upload logo to Supabase Storage
+
+All updates scoped to current tenantId.
+
+Invoice Generation Flow
+
+Page: /dashboard/invoices/new
+
+Textarea: “Describe what you did”
+
+Optional prefilled client name/address/email
+
+Server Action / API Route:
+
+Builds a strict structured prompt:
+
+“You are an invoice-generation model. Extract structured invoice details. Output valid JSON only with fields: client, items, total, notes, due_date…”
+
+Calls OpenAI and expects JSON only, matching:
+
+{
+  "client": { "name": "", "address": "", "email": "" },
+  "items": [{ "description": "", "quantity": 1, "price": 100 }],
+  "currency": "GBP",
+  "notes": "",
+  "due_date": ""
+}
+
+
+Validates the JSON with Zod.
+
+Creates Invoice + InvoiceItem[] in the DB with tenantId, recalculates totals on the server, and logs an ActivityLog event.
+
+Invoice Management
+
+/dashboard/invoices
+
+List invoices by tenantId
+
+Filters: status, date range
+
+Search by client name
+
+/dashboard/invoices/[id]
+
+Shows invoice details
+
+Buttons:
+
+Download PDF
+
+Send via email
+
+Mark as sent / paid (update status, log activity)
+
+Implement a PDF generator (e.g., using a React-based template rendered server-side).
+
+Admin Dashboard
+
+/admin/users
+
+Show one row per Tenant:
+
+Tenant name
+
+Number of users
+
+Subscription plan
+
+Invoice count
+
+Last active date
+
+Usage bar (green/amber/red based on invoices used vs plan limit)
+
+Export button for CSV of tenants.
+
+/admin/activity
+
+Live feed of ActivityLog:
+
+Timestamp, tenant, user, action, entityType
+
+Filters by action, tenant, date range.
+
+Billing
+
+Simple Stripe integration:
+
+Global Plan table
+
+Each Tenant has a Subscription
+
+Handle webhooks minimally to update Subscription.status and currentPeriodEnd.
+
+6. Project Structure
+
+Use this structure:
+
+/app
+  /(marketing)         // landing pages
+  /auth                // sign-in, callback
+  /dashboard
+    /invoices
+    /settings
+  /admin
+/lib
+  /db
+    router.ts          // tenant → shard → Prisma client
+  /auth
+  /billing
+/components
+/prisma
+/public
+
+7. Development Rules
+
+You MUST:
+
+Use TypeScript everywhere
+
+Validate all user input with Zod
+
+Always include tenantId in queries
+
+Add loading states and skeletons
+
+Add error boundaries and logging (Sentry)
+
+Keep components small and reusable
+
+Put shared UI in /components
+
+Add comments to complex logic (AI, routing, billing)
+
+8. AI Usage Rule
+
+When calling OpenAI:
+
+Use a system prompt that enforces:
+
+“Return ONLY JSON, never natural language”
+
+Validate all AI responses before inserting into the DB.
+
+If validation fails, show a friendly error to the user and allow retry.
+
+9. Output Format for This Session
+
+Whenever you modify or create a file, respond with:
+
+/path/to/file.tsx
+```ts
+// code here
+
+
+Include a brief explanation above each file if non-trivial.
+
+10. First Task
+
+Create the project structure (Next.js 14 + Tailwind + ShadCN).
+
+Add the Prisma schema exactly as provided.
+
+Implement the database router stub in lib/db/router.ts that:
+
+Returns a Prisma client for now using DATABASE_URL
+
+Accepts tenantId and hides the future sharding complexity.
+
+Then continue with authentication → tenants → company settings → invoice flow.
