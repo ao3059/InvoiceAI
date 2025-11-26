@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { FileText, Zap, Send, BarChart3, CreditCard, Mail, Check } from "lucide-react";
 import heroImage from "@assets/generated_images/invoice_generation_hero_background.png";
+import logoImage from "@assets/ChatGPT Image Nov 26, 2025, 06_46_18 PM_1764182886556.png";
 
 export default function Landing() {
   return (
@@ -11,10 +12,9 @@ export default function Landing() {
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <FileText className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">InvoiceAI</span>
-            </div>
+            <Link href="/">
+              <img src={logoImage} alt="InvoiceAI" className="h-10 w-auto cursor-pointer" />
+            </Link>
             <div className="flex items-center gap-4">
               <Link href="/auth/login">
                 <Button variant="ghost" data-testid="button-login">Sign In</Button>

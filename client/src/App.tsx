@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,6 +17,7 @@ import NewInvoice from "@/pages/dashboard/invoices/new";
 import CompanySettings from "@/pages/dashboard/settings/company";
 import AdminUsers from "@/pages/admin/users";
 import AdminActivity from "@/pages/admin/activity";
+import logoImage from "@assets/ChatGPT Image Nov 26, 2025, 06_46_18 PM_1764182886556.png";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const style = {
@@ -30,7 +31,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between p-4 border-b bg-background">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-3">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <Link href="/dashboard">
+                <img src={logoImage} alt="InvoiceAI" className="h-8 w-auto cursor-pointer" />
+              </Link>
+            </div>
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-8">
