@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const items = await storage.getInvoiceItems(invoice.id);
 
-      res.json({ ...invoice, items });
+      res.json({ invoice, items });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -14,6 +14,7 @@ import Login from "@/pages/auth/login";
 import DashboardHome from "@/pages/dashboard/home";
 import InvoiceList from "@/pages/dashboard/invoices/list";
 import NewInvoice from "@/pages/dashboard/invoices/new";
+import InvoiceDetail from "@/pages/dashboard/invoices/detail";
 import CompanySettings from "@/pages/dashboard/settings/company";
 import AdminUsers from "@/pages/admin/users";
 import AdminActivity from "@/pages/admin/activity";
@@ -103,6 +104,16 @@ function Router() {
           <ProtectedRoute>
             <DashboardLayout>
               <NewInvoice />
+            </DashboardLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+      
+      <Route path="/dashboard/invoices/:id">
+        {() => (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <InvoiceDetail />
             </DashboardLayout>
           </ProtectedRoute>
         )}

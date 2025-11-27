@@ -3,7 +3,10 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
-async function getCredentials() {
+// Check if we're on Replit
+const isReplit = !!(process.env.REPL_ID || process.env.REPLIT_CONNECTORS_HOSTNAME);
+
+async function getReplitCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -11,8 +14,8 @@ async function getCredentials() {
     ? 'depl ' + process.env.WEB_REPL_RENEWAL 
     : null;
 
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!xReplitToken || !hostname) {
+    throw new Error('Replit credentials not available');
   }
 
   connectionSettings = await fetch(
@@ -26,7 +29,7 @@ async function getCredentials() {
   ).then(res => res.json()).then(data => data.items?.[0]);
 
   if (!connectionSettings || (!connectionSettings.settings.api_key)) {
-    throw new Error('Resend not connected');
+    throw new Error('Resend not connected via Replit');
   }
   return {
     apiKey: connectionSettings.settings.api_key, 
@@ -34,14 +37,38 @@ async function getCredentials() {
   };
 }
 
+async function getDirectCredentials() {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'InvoiceAI <noreply@invoiceai.com>';
+  
+  if (!apiKey) {
+    return null;
+  }
+  
+  return { apiKey, fromEmail };
+}
+
 // WARNING: Never cache this client.
 // Access tokens expire, so a new client must be created each time.
-export async function getResendClient() {
-  const { apiKey, fromEmail } = await getCredentials();
-  return {
-    client: new Resend(apiKey),
-    fromEmail
-  };
+export async function getResendClient(): Promise<{ client: Resend; fromEmail: string } | null> {
+  // Try Replit connector first if on Replit
+  if (isReplit) {
+    try {
+      const { apiKey, fromEmail } = await getReplitCredentials();
+      return { client: new Resend(apiKey), fromEmail };
+    } catch (e) {
+      console.log('Replit connector not available, trying direct API key');
+    }
+  }
+  
+  // Fall back to direct API key
+  const credentials = await getDirectCredentials();
+  if (credentials) {
+    return { client: new Resend(credentials.apiKey), fromEmail: credentials.fromEmail };
+  }
+  
+  // No email service configured
+  return null;
 }
 
 export interface InvoiceEmailData {
@@ -63,7 +90,16 @@ export interface InvoiceEmailData {
 
 export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const { client, fromEmail } = await getResendClient();
+    const resendClient = await getResendClient();
+    
+    if (!resendClient) {
+      return { 
+        success: false, 
+        error: 'Email service not configured. Please set up Resend integration or add RESEND_API_KEY environment variable.' 
+      };
+    }
+    
+    const { client, fromEmail } = resendClient;
     
     const itemsHtml = data.items.map(item => `
       <tr>
