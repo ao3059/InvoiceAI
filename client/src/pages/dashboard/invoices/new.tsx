@@ -5,11 +5,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Sparkles } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
+import type { Company } from "@shared/schema";
 
 export default function NewInvoice() {
   const [description, setDescription] = useState("");
@@ -18,6 +20,12 @@ export default function NewInvoice() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  
+  const { data: company } = useQuery<Company>({
+    queryKey: ["/api/companies/current"],
+  });
+  
+  const isCompanyProfileIncomplete = !company?.name || !company?.email;
 
   const generateMutation = useMutation({
     mutationFn: async (data: { description: string; clientName?: string; clientEmail?: string }) => {
@@ -79,6 +87,20 @@ export default function NewInvoice() {
           Describe your work and let AI generate a professional invoice
         </p>
       </div>
+      
+      {isCompanyProfileIncomplete && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30" data-testid="alert-company-profile-incomplete">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-800 dark:text-amber-200">Complete your company profile</AlertTitle>
+          <AlertDescription className="text-amber-700 dark:text-amber-300">
+            Your company details will appear on invoices you send. Please{" "}
+            <Link href="/dashboard/settings/company" className="underline font-medium" data-testid="link-company-settings">
+              update your company settings
+            </Link>{" "}
+            before sending invoices to clients.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="space-y-6">

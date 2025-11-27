@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Send, Loader2, CheckCircle, Mail, Calendar, Building2 } from "lucide-react";
+import { ArrowLeft, Send, Loader2, CheckCircle, Mail, Calendar, Building2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Invoice, InvoiceItem, Company } from "@shared/schema";
@@ -132,9 +133,25 @@ export default function InvoiceDetail() {
   }
 
   const { invoice, items } = invoiceData;
+  
+  const isCompanyProfileIncomplete = !company?.name || !company?.email;
 
   return (
     <div className="space-y-6 max-w-4xl">
+      {isCompanyProfileIncomplete && invoice.status === "draft" && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30" data-testid="alert-company-profile-incomplete">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-800 dark:text-amber-200">Complete your company profile</AlertTitle>
+          <AlertDescription className="text-amber-700 dark:text-amber-300">
+            Your company details will appear on invoices you send. Please{" "}
+            <Link href="/dashboard/settings/company" className="underline font-medium" data-testid="link-company-settings">
+              update your company settings
+            </Link>{" "}
+            before sending invoices to clients.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/dashboard/invoices">

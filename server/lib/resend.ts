@@ -75,16 +75,30 @@ export interface InvoiceEmailData {
   clientName: string;
   clientEmail: string;
   invoiceNumber: string;
+  subtotal?: string | null;
+  tax?: string | null;
   total: string;
   currency: string;
   dueDate?: string | null;
+  issuedDate?: string | null;
   items: Array<{
     description: string;
     quantity: string;
     unitPrice: string;
     total: string;
   }>;
-  companyName?: string;
+  company?: {
+    name?: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    taxNumber?: string | null;
+    logoUrl?: string | null;
+  } | null;
   notes?: string | null;
 }
 
@@ -101,14 +115,37 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<{ succes
     
     const { client, fromEmail } = resendClient;
     
+    const company = data.company;
+    const companyName = company?.name || 'Your Company';
+    const currencySymbol = data.currency === 'GBP' ? '£' : data.currency === 'EUR' ? '€' : data.currency === 'USD' ? '$' : data.currency;
+    
     const itemsHtml = data.items.map(item => `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${item.description}</td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${data.currency === 'GBP' ? '£' : data.currency}${item.unitPrice}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${data.currency === 'GBP' ? '£' : data.currency}${item.total}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${currencySymbol}${item.unitPrice}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${currencySymbol}${item.total}</td>
       </tr>
     `).join('');
+
+    const companyAddressParts = [
+      company?.address,
+      company?.city,
+      company?.state,
+      company?.postalCode,
+      company?.country
+    ].filter(Boolean);
+    
+    const companyDetailsHtml = company ? `
+      <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        ${company.logoUrl ? `<img src="${company.logoUrl}" alt="${companyName}" style="max-height: 60px; max-width: 200px; margin-bottom: 15px;" />` : ''}
+        <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #1f2937;">${companyName}</h3>
+        ${companyAddressParts.length > 0 ? `<p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">${companyAddressParts.join(', ')}</p>` : ''}
+        ${company.email ? `<p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Email: ${company.email}</p>` : ''}
+        ${company.phone ? `<p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Phone: ${company.phone}</p>` : ''}
+        ${company.taxNumber ? `<p style="margin: 0; color: #6b7280; font-size: 14px;">Tax/VAT: ${company.taxNumber}</p>` : ''}
+      </div>
+    ` : '';
 
     const html = `
       <!DOCTYPE html>
@@ -120,10 +157,12 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<{ succes
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 30px; border-radius: 12px 12px 0 0;">
             <h1 style="color: white; margin: 0; font-size: 24px;">Invoice ${data.invoiceNumber}</h1>
-            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0;">From ${data.companyName || 'Your Company'}</p>
+            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0;">From ${companyName}</p>
           </div>
           
           <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+            ${companyDetailsHtml}
+            
             <p style="margin: 0 0 20px 0;">Dear ${data.clientName},</p>
             <p style="margin: 0 0 20px 0;">Please find your invoice details below:</p>
             
@@ -140,9 +179,21 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<{ succes
                 ${itemsHtml}
               </tbody>
               <tfoot>
+                ${data.subtotal && parseFloat(data.subtotal) !== parseFloat(data.total) ? `
+                <tr>
+                  <td colspan="3" style="padding: 8px 12px; text-align: right; color: #6b7280;">Subtotal:</td>
+                  <td style="padding: 8px 12px; text-align: right; color: #6b7280;">${currencySymbol}${data.subtotal}</td>
+                </tr>
+                ` : ''}
+                ${data.tax && parseFloat(data.tax) > 0 ? `
+                <tr>
+                  <td colspan="3" style="padding: 8px 12px; text-align: right; color: #6b7280;">Tax:</td>
+                  <td style="padding: 8px 12px; text-align: right; color: #6b7280;">${currencySymbol}${data.tax}</td>
+                </tr>
+                ` : ''}
                 <tr style="background: #f9fafb;">
                   <td colspan="3" style="padding: 12px; text-align: right; font-weight: 600;">Total:</td>
-                  <td style="padding: 12px; text-align: right; font-weight: 600; font-size: 18px;">${data.currency === 'GBP' ? '£' : data.currency}${data.total}</td>
+                  <td style="padding: 12px; text-align: right; font-weight: 600; font-size: 18px;">${currencySymbol}${data.total}</td>
                 </tr>
               </tfoot>
             </table>
@@ -164,7 +215,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<{ succes
     const result = await client.emails.send({
       from: fromEmail,
       to: data.clientEmail,
-      subject: `Invoice ${data.invoiceNumber} from ${data.companyName || 'Your Company'}`,
+      subject: `Invoice ${data.invoiceNumber} from ${companyName}`,
       html
     });
 
