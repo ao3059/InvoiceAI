@@ -2,89 +2,46 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateInvoiceFromDescription } from "./lib/openai";
-import { getCurrentUser, requireAuth, requireAdmin, AuthError } from "./lib/auth";
+import { sendInvoiceEmail } from "./lib/resend";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertInvoiceSchema, insertCompanySchema, aiInvoiceResponseSchema } from "@shared/schema";
 import { z } from "zod";
 
+// Helper to get user from Replit Auth session
+function getAuthUser(req: Request): { id: string; tenantId: string | null } | null {
+  const user = req.user as any;
+  if (!user?.claims?.sub) return null;
+  return {
+    id: user.claims.sub,
+    tenantId: null, // Will be fetched from database
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  // Setup Replit Auth
+  await setupAuth(app);
+
+  // Get current authenticated user with full details
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const { email } = req.body;
-
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
-      let user = await storage.getUserByEmail(email);
-
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
       if (!user) {
-        const tenant = await storage.createTenant({
-          name: `${email.split('@')[0]}'s Company`,
-        });
-
-        user = await storage.createUser({
-          id: `user_${Date.now()}`,
-          email,
-          tenantId: tenant.id,
-          role: email.includes("admin") ? "admin" : "member",
-        });
-
-        await storage.createCompany({
-          tenantId: tenant.id,
-          name: tenant.name,
-        });
-
-        const freePlan = (await storage.getPlans()).find((p) => p.name === "Free");
-        if (freePlan) {
-          await storage.createSubscription({
-            tenantId: tenant.id,
-            planId: freePlan.id,
-            status: "trialing",
-          });
-        }
+        return res.status(404).json({ message: "User not found" });
       }
-
-      req.session.user = {
-        id: user.id,
-        email: user.email,
-        tenantId: user.tenantId,
-        role: user.role,
-      };
-
-      await storage.createActivityLog({
-        tenantId: user.tenantId,
-        userId: user.id,
-        action: "user_login",
-        entityType: "user",
-        entityId: user.id,
-        metadata: null,
-      });
-
-      res.json({ user: req.session.user });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
-  app.post("/api/auth/logout", async (req: Request, res: Response) => {
-    req.session.destroy(() => {
-      res.json({ message: "Logged out" });
-    });
-  });
-
-  app.get("/api/auth/me", async (req: Request, res: Response) => {
-    const user = getCurrentUser(req);
-    if (!user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    res.json({ user });
-  });
-  
-  app.get("/api/dashboard/stats", async (req: Request, res: Response) => {
+  app.get("/api/dashboard/stats", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = getCurrentUser(req);
-      if (!user) {
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
         return res.json({
           totalInvoices: 0,
           sentInvoices: 0,
@@ -112,11 +69,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices", async (req: Request, res: Response) => {
+  app.get("/api/invoices", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
-      const { status, search } = req.query;
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
 
+      const { status, search } = req.query;
       const invoices = await storage.getInvoices(user.tenantId, {
         status: status as string,
         search: search as string,
@@ -124,14 +86,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(invoices);
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/invoices/:id", async (req: Request, res: Response) => {
+  app.get("/api/invoices/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
+
       const invoice = await storage.getInvoice(req.params.id);
 
       if (!invoice) {
@@ -146,14 +113,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ ...invoice, items });
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.post("/api/invoices/generate", async (req: Request, res: Response) => {
+  app.post("/api/invoices/generate", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
+
       const { description, clientName, clientEmail } = req.body;
 
       if (!description) {
@@ -213,17 +185,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ invoice, items });
     } catch (error: any) {
       console.error("Error generating invoice:", error);
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.patch("/api/invoices/:id/status", async (req: Request, res: Response) => {
+  // Send invoice via email
+  app.post("/api/invoices/:id/send", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
-      const { status } = req.body;
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
 
       const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (invoice.tenantId !== user.tenantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (!invoice.clientEmail) {
+        return res.status(400).json({ message: "Invoice has no client email address" });
+      }
+
+      const items = await storage.getInvoiceItems(invoice.id);
+      const company = await storage.getCompany(user.tenantId);
+
+      const emailResult = await sendInvoiceEmail({
+        clientName: invoice.clientName,
+        clientEmail: invoice.clientEmail,
+        invoiceNumber: invoice.invoiceNumber,
+        total: invoice.total || "0",
+        currency: invoice.currency,
+        dueDate: invoice.dueDate?.toISOString(),
+        items: items.map(item => ({
+          description: item.description,
+          quantity: item.quantity || "1",
+          unitPrice: item.unitPrice || "0",
+          total: item.total || "0",
+        })),
+        companyName: company?.name,
+        notes: invoice.notes,
+      });
+
+      if (!emailResult.success) {
+        return res.status(500).json({ message: `Failed to send email: ${emailResult.error}` });
+      }
+
+      // Update invoice status to sent
+      const updated = await storage.updateInvoice(invoice.id, {
+        status: "sent",
+        sentAt: new Date(),
+      });
+
+      await storage.createActivityLog({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: "invoice_sent",
+        entityType: "invoice",
+        entityId: invoice.id,
+        metadata: JSON.stringify({ 
+          invoiceNumber: invoice.invoiceNumber,
+          sentTo: invoice.clientEmail,
+          messageId: emailResult.messageId,
+        }),
+      });
+
+      res.json({ success: true, invoice: updated });
+    } catch (error: any) {
+      console.error("Error sending invoice:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/invoices/:id/status", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
+
+      const { status } = req.body;
+      const invoice = await storage.getInvoice(req.params.id);
+      
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
@@ -253,14 +303,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updated);
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/companies/current", async (req: Request, res: Response) => {
+  app.get("/api/companies/current", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
+
       const company = await storage.getCompany(user.tenantId);
 
       if (!company) {
@@ -269,14 +324,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(company);
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.post("/api/companies", async (req: Request, res: Response) => {
+  app.post("/api/companies", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
+
       const data = insertCompanySchema.parse(req.body);
 
       const existing = await storage.getCompany(user.tenantId);
@@ -294,14 +354,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.patch("/api/companies/:id", async (req: Request, res: Response) => {
+  app.patch("/api/companies/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const user = requireAuth(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.tenantId) {
+        return res.status(403).json({ message: "No tenant access" });
+      }
+
       const company = await storage.getCompany(user.tenantId);
 
       if (!company || company.id !== req.params.id) {
@@ -321,14 +386,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updated);
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/admin/tenants", async (req: Request, res: Response) => {
+  app.get("/api/admin/tenants", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      requireAdmin(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
 
       const tenants = await storage.getTenants();
 
@@ -352,14 +421,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(metrics);
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/admin/activity", async (req: Request, res: Response) => {
+  app.get("/api/admin/activity", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      requireAdmin(req);
+      const userId = (req.user as any)?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
 
       const { action, search } = req.query;
       const tenants = await storage.getTenants();
@@ -379,12 +452,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const logsWithDetails = await Promise.all(
         logs.map(async (log) => {
-          const user = log.userId ? await storage.getUser(log.userId) : null;
+          const logUser = log.userId ? await storage.getUser(log.userId) : null;
           const tenant = await storage.getTenant(log.tenantId);
 
           return {
             ...log,
-            user: user ? { email: user.email } : null,
+            user: logUser ? { email: logUser.email } : null,
             tenant: tenant ? { name: tenant.name } : null,
           };
         })
@@ -392,8 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(logsWithDetails);
     } catch (error: any) {
-      const status = error instanceof AuthError ? error.statusCode : 500;
-      res.status(status).json({ message: error.message });
+      res.status(500).json({ message: error.message });
     }
   });
 

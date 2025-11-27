@@ -116,17 +116,33 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium">
-              {user?.email?.[0].toUpperCase() || "U"}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">{user?.email?.split('@')[0] || "User"}</span>
-              <span className="text-xs text-muted-foreground">{user?.email || "user@example.com"}</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {user?.profileImageUrl ? (
+              <img 
+                src={user.profileImageUrl} 
+                alt="Profile" 
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium shrink-0">
+                {user?.firstName?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
+              </div>
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium truncate">
+                {user?.firstName || user?.email?.split('@')[0] || "User"}
+              </span>
+              <span className="text-xs text-muted-foreground truncate">
+                {user?.email || "user@example.com"}
+              </span>
             </div>
           </div>
-          <ThemeToggle />
+          <a href="/api/logout" className="shrink-0">
+            <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Logout
+            </button>
+          </a>
         </div>
       </SidebarFooter>
     </Sidebar>

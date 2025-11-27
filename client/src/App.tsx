@@ -1,10 +1,10 @@
-import { Switch, Route, Link } from "wouter";
+import { Switch, Route, Link, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,6 +18,30 @@ import CompanySettings from "@/pages/dashboard/settings/company";
 import AdminUsers from "@/pages/admin/users";
 import AdminActivity from "@/pages/admin/activity";
 import logoImage from "@assets/ChatGPT Image Nov 26, 2025, 06_46_18 PM_1764182886556.png";
+import { Loader2 } from "lucide-react";
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect to="/auth/login" />;
+  }
+
+  return <>{children}</>;
+}
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const style = {
@@ -56,49 +80,61 @@ function Router() {
       
       <Route path="/dashboard">
         {() => (
-          <DashboardLayout>
-            <DashboardHome />
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DashboardHome />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       
       <Route path="/dashboard/invoices">
         {() => (
-          <DashboardLayout>
-            <InvoiceList />
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <InvoiceList />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       
       <Route path="/dashboard/invoices/new">
         {() => (
-          <DashboardLayout>
-            <NewInvoice />
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <NewInvoice />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       
       <Route path="/dashboard/settings/company">
         {() => (
-          <DashboardLayout>
-            <CompanySettings />
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <CompanySettings />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       
       <Route path="/admin/users">
         {() => (
-          <DashboardLayout>
-            <AdminUsers />
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <AdminUsers />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       
       <Route path="/admin/activity">
         {() => (
-          <DashboardLayout>
-            <AdminActivity />
-          </DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout>
+              <AdminActivity />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       

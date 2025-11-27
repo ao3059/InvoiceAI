@@ -9,6 +9,7 @@ import {
   plans,
   type User,
   type InsertUser,
+  type UpsertUser,
   type Tenant,
   type InsertTenant,
   type Company,
@@ -31,6 +32,8 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  updateUserTenant(userId: string, tenantId: string): Promise<User | undefined>;
   
   getTenant(id: string): Promise<Tenant | undefined>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
@@ -74,6 +77,33 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
+  async updateUserTenant(userId: string, tenantId: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ tenantId, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
   }
 
   async getTenant(id: string): Promise<Tenant | undefined> {

@@ -1,19 +1,12 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { apiRequest } from "@/lib/queryClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-interface AuthUser {
-  id: string;
-  email: string;
-  tenantId: string;
-  role: string;
-}
+import { createContext, useContext, ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { User } from "@shared/schema";
 
 interface AuthContextType {
-  user: AuthUser | null;
+  user: User | null;
   isLoading: boolean;
-  login: (email: string) => Promise<void>;
-  logout: () => Promise<void>;
+  isAuthenticated: boolean;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,41 +14,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading } = useQuery<AuthUser | null>({
-    queryKey: ["/api/auth/me"],
+  const { data: user, isLoading } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/auth/login", { email });
-      return response.user;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout", {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-
-  const login = async (email: string) => {
-    await loginMutation.mutateAsync(email);
-  };
-
-  const logout = async () => {
-    await logoutMutation.mutateAsync();
+  const logout = () => {
+    window.location.href = "/api/logout";
   };
 
   return (
-    <AuthContext.Provider value={{ user: user || null, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ 
+      user: user || null, 
+      isLoading, 
+      isAuthenticated: !!user,
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );

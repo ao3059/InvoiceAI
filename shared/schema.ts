@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, decimal, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, decimal, pgEnum, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -7,6 +7,17 @@ import { relations } from "drizzle-orm";
 export const invoiceStatusEnum = pgEnum("invoice_status", ["draft", "sent", "paid", "cancelled"]);
 export const planTierEnum = pgEnum("plan_tier", ["free", "starter", "professional", "enterprise"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "cancelled", "past_due", "trialing"]);
+
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
 
 export const tenants = pgTable("tenants", {
   id: varchar("id", { length: 255 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -16,12 +27,17 @@ export const tenants = pgTable("tenants", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Users table with Replit Auth fields
 export const users = pgTable("users", {
-  id: varchar("id", { length: 255 }).primaryKey(),
-  email: text("email").notNull().unique(),
-  tenantId: varchar("tenant_id", { length: 255 }).notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  id: varchar("id", { length: 255 }).primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  tenantId: varchar("tenant_id", { length: 255 }).references(() => tenants.id, { onDelete: "cascade" }),
   role: text("role").notNull().default("member"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const companies = pgTable("companies", {
@@ -147,7 +163,7 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
 }));
 
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertUserSchema = createInsertSchema(users).omit({ createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ createdAt: true, updatedAt: true });
 export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true });
@@ -155,10 +171,14 @@ export const insertPlanSchema = createInsertSchema(plans).omit({ id: true, creat
 export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
 
+// User upsert schema for Replit Auth
+export const upsertUserSchema = createInsertSchema(users).omit({ createdAt: true, updatedAt: true, tenantId: true, role: true });
+
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Invoice = typeof invoices.$inferSelect;
