@@ -195,7 +195,7 @@ export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export const aiInvoiceResponseSchema = z.object({
   client: z.object({
     name: z.string(),
-    email: z.string().email().optional().nullable(),
+    email: z.string().optional().nullable(),
     address: z.string().optional().nullable(),
   }),
   items: z.array(z.object({

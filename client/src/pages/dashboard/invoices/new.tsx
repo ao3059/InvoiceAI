@@ -51,6 +51,19 @@ export default function NewInvoice() {
       return;
     }
 
+    // Validate email format if provided
+    if (clientEmail && clientEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(clientEmail.trim())) {
+        toast({
+          title: "Invalid email format",
+          description: "Please enter a valid email address (e.g., client@example.com)",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     generateMutation.mutate({
       description,
       clientName: clientName || undefined,
