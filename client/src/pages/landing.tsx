@@ -16,12 +16,12 @@ export default function Landing() {
               <img src={logoImage} alt="InvoiceAI" className="h-10 w-auto cursor-pointer" />
             </Link>
             <div className="flex items-center gap-4">
-              <a href="/api/login">
+              <Link href="/auth/login">
                 <Button variant="ghost" data-testid="button-login">Sign In</Button>
-              </a>
-              <a href="/api/login">
+              </Link>
+              <Link href="/auth/login">
                 <Button data-testid="button-get-started">Get Started</Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -44,11 +44,11 @@ export default function Landing() {
               Describe your work in plain English. Our AI creates perfect invoices with line items, totals, and professional formatting.
             </p>
             <div className="flex flex-wrap gap-4">
-              <a href="/api/login">
+              <Link href="/auth/login">
                 <Button size="lg" className="text-lg px-8" data-testid="button-hero-start-trial">
                   Start Free Trial
                 </Button>
-              </a>
+              </Link>
               <Button size="lg" variant="outline" className="text-lg px-8 bg-background/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20" data-testid="button-hero-demo">
                 See Demo
               </Button>

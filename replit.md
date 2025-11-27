@@ -52,10 +52,13 @@ Preferred communication style: Simple, everyday language.
 - **Session**: express-session with PostgreSQL session store (connect-pg-simple)
 - **API Design**: RESTful JSON endpoints with proper status codes
 
-**Authentication** (Replit Auth):
-- OpenID Connect integration with Replit's identity provider
-- Supports Google, GitHub, Apple, and email/password login
-- Session-based with automatic token refresh
+**Authentication** (Dual-mode):
+- **On Replit**: OpenID Connect integration with Replit's identity provider
+  - Supports Google, GitHub, Apple, and email/password login via Replit Auth
+  - Session-based with automatic token refresh
+- **On External Deployments (Railway, etc.)**: Simple email-based login
+  - Email login with automatic account creation
+  - Session-based authentication
 - Auto-provisions tenant + company + subscription on first login
 - Role-based access control (admin vs member)
 - Proper error handling with 401/403 status codes

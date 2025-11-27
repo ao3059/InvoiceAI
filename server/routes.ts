@@ -3,28 +3,38 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateInvoiceFromDescription } from "./lib/openai";
 import { sendInvoiceEmail } from "./lib/resend";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isReplit } from "./replitAuth";
 import { insertInvoiceSchema, insertCompanySchema, aiInvoiceResponseSchema } from "@shared/schema";
 import { z } from "zod";
 
-// Helper to get user from Replit Auth session
-function getAuthUser(req: Request): { id: string; tenantId: string | null } | null {
-  const user = req.user as any;
-  if (!user?.claims?.sub) return null;
-  return {
-    id: user.claims.sub,
-    tenantId: null, // Will be fetched from database
-  };
+// Helper to get user ID from either session (email login) or Replit Auth (OAuth)
+function getUserId(req: Request): string | null {
+  // First check session-based auth (works in both modes with email login)
+  const sessionUserId = (req as any).session?.userId;
+  if (sessionUserId) {
+    return sessionUserId;
+  }
+  
+  // Then check Replit Auth (OAuth)
+  if (isReplit) {
+    const user = req.user as any;
+    return user?.claims?.sub || null;
+  }
+  
+  return null;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup Replit Auth
+  // Setup Auth (Replit Auth or simple email auth)
   await setupAuth(app);
 
   // Get current authenticated user with full details
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -38,7 +48,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dashboard/stats", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -71,7 +84,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invoices", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -92,7 +108,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invoices/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -119,7 +138,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices/generate", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -192,7 +214,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Send invoice via email
   app.post("/api/invoices/:id/send", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -264,7 +289,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/invoices/:id/status", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -309,7 +337,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/companies/current", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -330,7 +361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/companies", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -360,7 +394,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/companies/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user?.tenantId) {
@@ -392,7 +429,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/tenants", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user || user.role !== "admin") {
@@ -427,7 +467,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/activity", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const userId = (req.user as any)?.claims?.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const user = await storage.getUser(userId);
       
       if (!user || user.role !== "admin") {
